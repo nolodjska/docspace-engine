@@ -88,6 +88,20 @@ Content here...
 
 - Python ≥ 3.11
 
+## AI Team Integration
+
+docspace-engine is designed for AI-driven development workflows. It serves as the documentation backbone for:
+
+| Role | Tool | Usage |
+|------|------|-------|
+| **Batch Executor** | Codex | Executes implementation plans; uses `impact` to check what docs need updating |
+| **Architect** | Claude Code | Writes plans and reviews code; uses `retrieve-v2` to fetch context before decisions |
+
+**Typical workflow:**
+1. Claude Code retrieves relevant docs via `retrieve-v2` before writing a plan
+2. Codex executes the plan and runs `impact` to find affected documents
+3. Both use `status` to verify docspace health before operations
+
 ## Development
 
 ```bash
@@ -179,3 +193,17 @@ tested_by:
 2. **关系索引** — 通过 `implemented_by`、`tested_by`、`depends_on` 字段构建反向查找
 3. **影响分析** — 通过关系索引将代码路径映射到文档
 4. **信任层** — 当引用的代码变更时降低文档信任度
+
+### AI 团队协作
+
+docspace-engine 专为 AI 驱动开发流程设计，是以下角色的文档基础设施：
+
+| 角色 | 工具 | 用途 |
+|------|------|------|
+| **批量执行** | Codex | 执行实现计划；使用 `impact` 检查哪些文档需要更新 |
+| **架构师** | Claude Code | 编写计划和审阅代码；使用 `retrieve-v2` 在决策前获取上下文 |
+
+**典型工作流：**
+1. Claude Code 在编写计划前通过 `retrieve-v2` 检索相关文档
+2. Codex 执行计划并运行 `impact` 查找受影响的文档
+3. 双方在操作前使用 `status` 验证 docspace 状态
