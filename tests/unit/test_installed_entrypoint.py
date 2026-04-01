@@ -16,7 +16,7 @@ def test_installed_module_works_from_outside_repo():
     )
 
     result = subprocess.run(
-        [sys.executable, "-m", "docspace_engine.cli", "--workspace", "D:/developItems", "status"],
+        ["docspace-engine", "--workspace", "D:/developItems", "status"],
         cwd="D:/developItems",
         capture_output=True,
         text=True,

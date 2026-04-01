@@ -5,6 +5,9 @@ description = "Internal-first Docspace engine cut out from QI"
 readme = "README.md"
 requires-python = ">=3.11"
 
+[project.scripts]
+docspace-engine = "docspace_engine.cli:main"
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
