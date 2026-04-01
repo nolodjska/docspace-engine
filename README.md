@@ -114,7 +114,7 @@ pip install -e .
 
 ## License
 
-Internal use only — extracted from the QI project.
+MIT License
 
 ---
 

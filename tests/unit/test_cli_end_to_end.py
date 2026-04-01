@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-EXAMPLE_WORKSPACE = ROOT / ".." / "examples" / "fake-workspace"
+EXAMPLE_WORKSPACE = ROOT / ".." / "examples" / "example-workspace"
 SRC_ROOT = ROOT / ".." / "src"
 
 
@@ -24,7 +24,7 @@ def _run_cli(*args: str):
     )
 
 
-def test_cli_supports_status_impact_and_retrieve_v2_against_fake_workspace():
+def test_cli_supports_status_impact_and_retrieve_v2_against_example_workspace():
     status = _run_cli("status")
     assert status.returncode == 0
     assert json.loads(status.stdout)["state"] == "ready"

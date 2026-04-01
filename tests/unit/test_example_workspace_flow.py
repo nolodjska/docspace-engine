@@ -6,7 +6,7 @@ from docspace_engine import cli
 FIXTURE_ROOT = Path(__file__).resolve().parent.parent / "fixtures" / "workspace"
 
 
-def test_fake_workspace_supports_impact_and_retrieve_v2():
+def test_example_workspace_supports_impact_and_retrieve_v2():
     cli.PROJECT_ROOT = str(FIXTURE_ROOT)
 
     impact = cli.compute_change_impact(["src/sidebar.js"])
