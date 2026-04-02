@@ -18,4 +18,4 @@ def test_python_m_cli_works_from_repo_root_without_install():
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["state"] == "ready"
+    assert payload["state"] in ("cold", "stale", "hot")

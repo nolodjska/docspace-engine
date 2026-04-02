@@ -25,4 +25,4 @@ def test_installed_module_works_from_outside_repo():
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["state"] == "ready"
+    assert payload["state"] in ("cold", "stale", "hot")

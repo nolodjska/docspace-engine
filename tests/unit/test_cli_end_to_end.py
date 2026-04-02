@@ -25,9 +25,21 @@ def _run_cli(*args: str):
 
 
 def test_cli_supports_status_impact_and_retrieve_v2_against_example_workspace():
+    # Status should report cold or hot (depends on index existence)
     status = _run_cli("status")
     assert status.returncode == 0
-    assert json.loads(status.stdout)["state"] == "ready"
+    state = json.loads(status.stdout)["state"]
+    assert state in ("cold", "stale", "hot")
+
+    # Index the workspace first
+    index = _run_cli("index")
+    assert index.returncode == 0
+    assert json.loads(index.stdout)["state"] == "hot"
+
+    # Now status should be hot
+    status2 = _run_cli("status")
+    assert status2.returncode == 0
+    assert json.loads(status2.stdout)["state"] == "hot"
 
     impact = _run_cli("impact", "--paths", "src/sidebar.js")
     assert impact.returncode == 0
