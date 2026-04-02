@@ -46,11 +46,64 @@ def _extract_frontmatter(filepath: str) -> dict:
 
 
 def _extract_title(filepath: str) -> str:
+    """Extract the first H1 title from markdown body."""
+    try:
+        text = Path(filepath).read_text(encoding="utf-8")
+    except Exception:
+        return Path(filepath).stem
+    # Skip frontmatter
+    lines = text.splitlines()
+    start = 0
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                start = i + 1
+                break
+    # Find first H1
+    for line in lines[start:]:
+        if line.startswith("# "):
+            return line[2:].strip()
     return Path(filepath).stem
 
 
 def _extract_summary(filepath: str) -> str:
-    return ""
+    """Extract the first non-empty paragraph from markdown body, truncated to 200 chars."""
+    try:
+        text = Path(filepath).read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    lines = text.splitlines()
+    # Skip frontmatter
+    start = 0
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                start = i + 1
+                break
+    # Collect first non-empty, non-heading paragraph
+    paragraph_lines = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if not stripped:
+            if paragraph_lines:
+                break
+            continue
+        if stripped.startswith("#"):
+            if paragraph_lines:
+                break
+            continue
+        paragraph_lines.append(stripped)
+    summary = " ".join(paragraph_lines)
+    return summary[:200]
+
+
+import re
+from typing import Set
+
+
+def _tokenize(text: str) -> Set[str]:
+    """Normalize text to lowercase tokens, splitting on non-alphanumeric."""
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 def _iter_doc_nodes():
@@ -62,7 +115,8 @@ def _iter_doc_nodes():
         meta = _extract_frontmatter(str(path))
         if not meta.get("id"):
             continue
-        nodes.append({"id": meta["id"], **meta})
+        rel_path = str(path.relative_to(Path(PROJECT_ROOT))).replace("\\", "/")
+        nodes.append({"id": meta["id"], "path": rel_path, **meta})
     return nodes
 
 
@@ -81,12 +135,55 @@ def _default_index_manifest() -> dict:
     return {"trust": {}, "last_impact": {}}
 
 
+def _build_searchable_text(node: dict) -> str:
+    """Build a searchable blob from all relevant doc fields."""
+    parts = [
+        node.get("id", ""),
+        node.get("type", ""),
+        node.get("parent", ""),
+        node.get("_title", ""),
+        node.get("_summary", ""),
+    ]
+    # Flatten list fields
+    for field in ("implemented_by", "tested_by"):
+        vals = node.get(field)
+        if isinstance(vals, list):
+            parts.extend(vals)
+        elif vals:
+            parts.append(str(vals))
+    return " ".join(str(p) for p in parts)
+
+
 def _resolve_start_node_from_query(query: str) -> str | None:
-    lowered = query.lower()
+    """Multi-field token-matching query resolver.
+
+    Tokenize the query, then score each doc node by how many query tokens
+    appear in its searchable text. Return the doc_id with the highest score,
+    or None if no tokens match at all.
+    """
+    query_tokens = _tokenize(query)
+    if not query_tokens:
+        return None
+
+    best_id: str | None = None
+    best_score = 0
+
     for node in _iter_doc_nodes():
-        if lowered in str(node.get("id", "")).lower():
-            return node["id"]
-    return None
+        doc_id = node.get("id")
+        if not doc_id:
+            continue
+        # Enrich node with title and summary for matching
+        node["_title"] = _extract_title(str(Path(PROJECT_ROOT) / node.get("path", ""))) if node.get("path") else ""
+        node["_summary"] = _extract_summary(str(Path(PROJECT_ROOT) / node.get("path", ""))) if node.get("path") else ""
+
+        searchable = _build_searchable_text(node)
+        doc_tokens = _tokenize(searchable)
+        score = len(query_tokens & doc_tokens)
+        if score > best_score:
+            best_score = score
+            best_id = doc_id
+
+    return best_id
 
 
 def retrieve_tree_context(doc_id: str | None) -> dict:
