@@ -182,13 +182,44 @@ def _build_searchable_text(node: dict) -> str:
     return " ".join(str(p) for p in parts)
 
 
-def _resolve_start_node_from_query(query: str) -> str | None:
-    """Multi-field token-matching query resolver.
+def _score_node(query_tokens: set, node: dict) -> int:
+    """Score a node against query tokens with field weights.
 
-    Tokenize the query, then score each doc node by how many query tokens
-    appear in its searchable text. Return the doc_id with the highest score,
-    or None if no tokens match at all.
+    Field weights:
+      id, title            → 5 (most precise)
+      summary, list fields → 2 (good signal, short)
+      body                 → 1 (largest, noisiest)
     """
+    score = 0
+
+    # Weight 5: id + title
+    id_title = _tokenize(f"{node.get('id', '')} {node.get('_title', '')}")
+    score += 5 * len(query_tokens & id_title)
+
+    # Weight 2: summary
+    summary_tokens = _tokenize(node.get("_summary", ""))
+    score += 2 * len(query_tokens & summary_tokens)
+
+    # Weight 2: list fields
+    for field in ("implemented_by", "tested_by"):
+        vals = node.get(field)
+        if isinstance(vals, list):
+            field_tokens = _tokenize(" ".join(str(v) for v in vals))
+        elif vals:
+            field_tokens = _tokenize(str(vals))
+        else:
+            continue
+        score += 2 * len(query_tokens & field_tokens)
+
+    # Weight 1: body
+    body_tokens = _tokenize(node.get("_body", ""))
+    score += len(query_tokens & body_tokens)
+
+    return score
+
+
+def _resolve_start_node_from_query(query: str) -> str | None:
+    """Multi-field weighted token-matching query resolver."""
     query_tokens = _tokenize(query)
     if not query_tokens:
         return None
@@ -200,15 +231,12 @@ def _resolve_start_node_from_query(query: str) -> str | None:
         doc_id = node.get("id")
         if not doc_id:
             continue
-        # Enrich node with title, summary, and body for matching
         filepath = str(Path(PROJECT_ROOT) / node.get("path", "")) if node.get("path") else ""
         node["_title"] = _extract_title(filepath)
         node["_summary"] = _extract_summary(filepath)
         node["_body"] = _extract_body(filepath)
 
-        searchable = _build_searchable_text(node)
-        doc_tokens = _tokenize(searchable)
-        score = len(query_tokens & doc_tokens)
+        score = _score_node(query_tokens, node)
         if score > best_score:
             best_score = score
             best_id = doc_id
