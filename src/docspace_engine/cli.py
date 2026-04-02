@@ -67,6 +67,30 @@ def _extract_title(filepath: str) -> str:
     return Path(filepath).stem
 
 
+def _extract_body(filepath: str, max_chars: int = 2000) -> str:
+    """Extract body text from markdown (excluding frontmatter), truncated to max_chars."""
+    try:
+        text = Path(filepath).read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    lines = text.splitlines()
+    start = 0
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                start = i + 1
+                break
+    # Collect body lines, strip markdown syntax
+    body_lines = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            continue
+        body_lines.append(stripped)
+    body = " ".join(body_lines)
+    return body[:max_chars]
+
+
 def _extract_summary(filepath: str) -> str:
     """Extract the first non-empty paragraph from markdown body, truncated to 200 chars."""
     try:
@@ -103,8 +127,10 @@ from typing import Set
 
 
 def _tokenize(text: str) -> Set[str]:
-    """Normalize text to lowercase tokens, splitting on non-alphanumeric."""
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+    """Normalize text to lowercase tokens. Handles CJK characters as individual tokens."""
+    # Match ASCII words, or individual CJK characters, or digits
+    tokens = set(re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]", text.lower()))
+    return tokens
 
 
 def _iter_doc_nodes():
@@ -144,6 +170,7 @@ def _build_searchable_text(node: dict) -> str:
         node.get("parent", ""),
         node.get("_title", ""),
         node.get("_summary", ""),
+        node.get("_body", ""),
     ]
     # Flatten list fields
     for field in ("implemented_by", "tested_by"):
@@ -173,9 +200,11 @@ def _resolve_start_node_from_query(query: str) -> str | None:
         doc_id = node.get("id")
         if not doc_id:
             continue
-        # Enrich node with title and summary for matching
-        node["_title"] = _extract_title(str(Path(PROJECT_ROOT) / node.get("path", ""))) if node.get("path") else ""
-        node["_summary"] = _extract_summary(str(Path(PROJECT_ROOT) / node.get("path", ""))) if node.get("path") else ""
+        # Enrich node with title, summary, and body for matching
+        filepath = str(Path(PROJECT_ROOT) / node.get("path", "")) if node.get("path") else ""
+        node["_title"] = _extract_title(filepath)
+        node["_summary"] = _extract_summary(filepath)
+        node["_body"] = _extract_body(filepath)
 
         searchable = _build_searchable_text(node)
         doc_tokens = _tokenize(searchable)
